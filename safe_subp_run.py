@@ -16,7 +16,9 @@ def _needs_sudo_retry(stderr: str, os_name: str) -> bool:
         "can't connect",
         "permission denied",
         "access denied",
-        "connect: permission denied"
+        "connect: permission denied",
+        "not permitted",
+        "root"
     ])
 
 
@@ -26,6 +28,8 @@ def safe_subp_run(
     timeout=10,
     delay_between_retries=2,
     enable_sudo_retry=False,
+    promt='Please enter your password to continue',
+    background=False,
     **kwargs
 ):
     """
@@ -46,9 +50,21 @@ def safe_subp_run(
     for attempt in range(1, retries + 1):
         try:
             logger.info(f"[{attempt}/{retries}] Running: {' '.join(command)}")
-            result = subprocess.run(command, timeout=timeout, **kwargs)
+            if background:
+                p = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                time.sleep(1) 
+                retcode = p.poll()
+                if retcode is not None:
+                    stderr = p.stderr.read().decode()
+                    raise subprocess.CalledProcessError(
+                        returncode=retcode,
+                        cmd=command,
+                        stderr=stderr
+                    )
+            else:
+                p = subprocess.run(command, timeout=timeout, **kwargs)
             logger.info(f"✅ Subprocess <{' '.join(command)}> succeeded.")
-            return result
+            return p
 
         except subprocess.TimeoutExpired as e:
             logger.warning(f"[{attempt}] Subprocess: <{' '.join(command)}> Timeout: command took too long ({timeout}s)")
@@ -57,23 +73,48 @@ def safe_subp_run(
         except subprocess.CalledProcessError as e:
             logger.warning(f"[{attempt}] for subprocess <{' '.join(command)}> CalledProcessError: {e}")
             last_exception = e
-
             # Check if sudo retry is appropriate
             if enable_sudo_retry and _needs_sudo_retry(e.stderr or "", os_name):
-                try:
-                    sudo_cmd = ["sudo"] + command
-                    logger.info(f"🔁 Retrying <{' '.join(command)}> with sudo: {' '.join(sudo_cmd)}")
-                    sudo_result = subprocess.run(
-                        sudo_cmd, timeout=timeout, **kwargs
+                if os_name.startswith("darwin"): # Run via AppleScript official widget
+                    quoted_cmd = " ".join(command).replace('"', '\\"')
+                    applescript = applescript = (
+                        f"do shell script \"{quoted_cmd}\" "
+                        f"with administrator privileges "
+                        f"with prompt \"{promt}\""
                     )
-                    logger.info(f"✅ Subprocess <{' '.join(command)}> with sudo succeeded.")
-                    return sudo_result
-                except subprocess.CalledProcessError as sudo_err:
-                    logger.error(f"❌ Sudo retry for <{' '.join(command)}>failed: {sudo_err}")
-                    last_exception = sudo_err
-                except Exception as sudo_unexpected:
-                    logger.error(f"❌ Unexpected error in sudo retry of <{' '.join(command)}>: {sudo_unexpected}")
-                    last_exception = sudo_unexpected
+
+                    logger.info(f"🔁 Retrying via AppleScript: {applescript}")
+                    try:
+                        if background:
+                            return subprocess.Popen(["osascript", "-e", applescript], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        else:
+                            return subprocess.run(
+                                ["osascript", "-e", applescript],
+                                timeout=timeout,
+                                capture_output=True,
+                                text=True
+                            )
+                    except Exception as apple_err:
+                        logger.error(f"❌ AppleScript sudo failed: {apple_err}")
+                        last_exception = apple_err
+                else: # Normal sudo fallback
+                    try:
+                        sudo_cmd = ["sudo"] + command
+                        logger.info(f"🔁 Retrying <{' '.join(command)}> with sudo: {' '.join(sudo_cmd)}")
+                        if background:
+                            sudo_result = subprocess.Popen(sudo_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        else:
+                            sudo_result = subprocess.run(
+                                sudo_cmd, timeout=timeout, **kwargs
+                            )
+                        logger.info(f"✅ Subprocess <{' '.join(command)}> with sudo succeeded.")
+                        return sudo_result
+                    except subprocess.CalledProcessError as sudo_err:
+                        logger.error(f"❌ Sudo retry for <{' '.join(command)}>failed: {sudo_err}")
+                        last_exception = sudo_err
+                    except Exception as sudo_unexpected:
+                        logger.error(f"❌ Unexpected error in sudo retry of <{' '.join(command)}>: {sudo_unexpected}")
+                        last_exception = sudo_unexpected
             else:
                 return e
 
@@ -87,3 +128,8 @@ def safe_subp_run(
 
     logger.error(f"❌ All attempts failed for subprocess <{' '.join(command)}>.")
     raise last_exception
+
+
+if __name__ == '__main__':
+    #print(_needs_sudo_retry(["ifconfig", "lo0", "down"], "darwin"))
+    safe_subp_run(["ifconfig", "lo0", "down"], enable_sudo_retry=True, check=True, capture_output=True, text=True)

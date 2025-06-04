@@ -154,12 +154,11 @@ def start_tailscaled_if_needed() -> bool:
 
     try:
         print(f"🚀 Starting tailscaled via: {path}")
-        shell_cmd = f"nohup {shlex.quote(path)} --state=mem: >/dev/null 2>&1 &"
-        sudo_cmd = ["sudo", "sh", "-c", shell_cmd]
+        shell_cmd = [f"{path}", "--state=mem:"]
 
         safe_subp_run(
-            sudo_cmd, retries=3, timeout=5, delay_between_retries=3,
-            check=True, text=True, stdin=sys.stdin
+            shell_cmd, retries=3, timeout=10, delay_between_retries=3, enable_sudo_retry=True,
+            check=True, text=True, background=True, stdin=sys.stdin, promt="Please enter your password to run Tailscale"
         )
 
         for _ in range(10):
@@ -203,8 +202,8 @@ def tailscale_up(hostname: str, auth_token: str) -> bool:
 
     try:
         logger.info(f"Starting tailscale for {hostname}")
-        safe_subp_run(cmd, retries=3, timeout=5, delay_between_retries=3,
-                      check=True, capture_output=True, text=True, shell=os_name.startswith("win"), enable_sudo_retry=True)
+        safe_subp_run(cmd, retries=3, timeout=15, delay_between_retries=3,
+                      check=True, capture_output=True, text=True, shell=os_name.startswith("win"), enable_sudo_retry=True, promt="Please enter your password to run Tailscale")
         print("✅ Tailscale started.")
         logger.info(f"{hostname} Tailscale start succeeded on {os_name}")
         return True
@@ -231,8 +230,8 @@ def tailscale_down():
     print("🔌 Disconnecting from Tailnet...")
 
     try:
-        safe_subp_run(cmd, retries=3, timeout=5, delay_between_retries=3,
-                      check=True, capture_output=True, text=True, shell=shell_flag, enable_sudo_retry=True)
+        safe_subp_run(cmd, retries=3, timeout=15, delay_between_retries=3,
+                      check=True, capture_output=True, text=True, shell=shell_flag, enable_sudo_retry=True, promt="Please enter your password to finish Tailscale")
         print("✅ Tailscale VPN disconnected.")
         logger.info("Tailscale VPN disconnected")
 
@@ -256,7 +255,10 @@ def stop_tailscaled() -> bool:
             return False
 
         for pid in result.stdout.strip().split():
-            subprocess.run(["sudo", "kill", pid])
+            #subprocess.run(["sudo", "kill", pid])
+            safe_subp_run(["kill", pid], retries=3, timeout=15, delay_between_retries=3,
+                      check=True, capture_output=True, text=True, enable_sudo_retry=True, promt="Please enter your password to finish Tailscaled daemon")
+        
         return True
     except Exception as e:
         logger.warning(f"❌ Could not stop tailscaled: {e}")
