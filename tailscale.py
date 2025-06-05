@@ -157,7 +157,7 @@ def start_tailscaled_if_needed() -> bool:
         shell_cmd = [f"{path}", "--state=mem:"]
 
         safe_subp_run(
-            shell_cmd, retries=3, timeout=10, delay_between_retries=3, enable_sudo_retry=True,
+            shell_cmd, retries=3, timeout=60, delay_between_retries=3, enable_sudo_retry=True,
             check=True, text=True, background=True, stdin=sys.stdin, promt="Please enter your password to run Tailscale"
         )
 
@@ -202,7 +202,7 @@ def tailscale_up(hostname: str, auth_token: str) -> bool:
 
     try:
         logger.info(f"Starting tailscale for {hostname}")
-        safe_subp_run(cmd, retries=3, timeout=15, delay_between_retries=3,
+        safe_subp_run(cmd, retries=3, timeout=60, delay_between_retries=3,
                       check=True, capture_output=True, text=True, shell=os_name.startswith("win"), enable_sudo_retry=True, promt="Please enter your password to run Tailscale")
         print("✅ Tailscale started.")
         logger.info(f"{hostname} Tailscale start succeeded on {os_name}")
@@ -230,7 +230,7 @@ def tailscale_down():
     print("🔌 Disconnecting from Tailnet...")
 
     try:
-        safe_subp_run(cmd, retries=3, timeout=15, delay_between_retries=3,
+        safe_subp_run(cmd, retries=3, timeout=60, delay_between_retries=3,
                       check=True, capture_output=True, text=True, shell=shell_flag, enable_sudo_retry=True, promt="Please enter your password to finish Tailscale")
         print("✅ Tailscale VPN disconnected.")
         logger.info("Tailscale VPN disconnected")
@@ -256,7 +256,7 @@ def stop_tailscaled() -> bool:
 
         for pid in result.stdout.strip().split():
             #subprocess.run(["sudo", "kill", pid])
-            safe_subp_run(["kill", pid], retries=3, timeout=15, delay_between_retries=3,
+            safe_subp_run(["kill", pid], retries=3, timeout=60, delay_between_retries=3,
                       check=True, capture_output=True, text=True, enable_sudo_retry=True, promt="Please enter your password to finish Tailscaled daemon")
         
         return True
