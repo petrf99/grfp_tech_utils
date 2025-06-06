@@ -15,7 +15,7 @@ def udp_proxy_loop(listen_ip, listen_port, target_ip, target_port, ip_whitelist 
     try:
         if status_event:
             status_event.set()
-        while not any(event.is_set() for event in stop_events):
+        while all(event.is_set() for event in stop_events):
             if status_event.is_set():
                 try:
                     data, addr = sock.recvfrom(65536)  # max UDP size

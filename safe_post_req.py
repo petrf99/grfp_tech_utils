@@ -34,7 +34,7 @@ def post_request(
     logger.info(f"Post request {description} to {url}: {payload}")
     try:
         for k in range(retries):
-            if event_to_set and event_to_set.is_set():
+            if event_to_set and not event_to_set.is_set():
                 logger.warning(f"{description} aborted: event is set")
                 return None
             try:
@@ -59,7 +59,7 @@ def post_request(
 
     except KeyboardInterrupt:
         if event_to_set:
-            event_to_set.set()
+            event_to_set.clear()
         logger.warning(f"Aborted by keyboard interrupt during: {description}")
 
     return None
