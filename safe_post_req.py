@@ -38,7 +38,7 @@ def post_request(
                 logger.warning(f"{description} aborted: event is set")
                 return None
             try:
-                response = requests.post(url, json=payload, timeout=20)
+                response = requests.post(url, json=payload, timeout=3)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("status") == "ok":
