@@ -61,3 +61,6 @@ class UDPListener:
         except:
             pass
         self._thread.join(timeout=1)
+
+    def get_sock(self):
+        return self._sock
