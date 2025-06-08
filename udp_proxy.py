@@ -1,14 +1,14 @@
-import socket
 import time
+import socket
+from tech_utils.udp_listener import UDPListener
 
 from tech_utils.logger import init_logger
 logger = init_logger("UDP_Proxy")
 
-def udp_proxy_loop(listen_ip, listen_port, target_ip, target_port, ip_whitelist = [], stop_events = [], status_event = None, name="UDP Proxy", log_delay = 1, transformer = lambda x: x, sock_timeout = 0.01):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((listen_ip, listen_port))
-    sock.settimeout(sock_timeout)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+def udp_proxy_loop(listen_ip, listen_port, target_ip, target_port, buffer_max_size = 1, ip_whitelist = [], stop_events = [], status_event = None, name="UDP Proxy", log_delay = 1, transformer = lambda x: x, sock_timeout = 0.01):
+    with_addr = bool(ip_whitelist)
+    listener = UDPListener(port=listen_port, parse_json=False, bind_host=listen_ip, save_addr=with_addr, buffer_max_size=buffer_max_size)
+    sock = listener.get_sock()
     logger.info(f"{name} UDP-listening on {listen_ip}:{listen_port} → {target_ip}:{target_port}")
 
     last_inp_log_time = 0
@@ -18,11 +18,23 @@ def udp_proxy_loop(listen_ip, listen_port, target_ip, target_port, ip_whitelist 
         while all(event.is_set() for event in stop_events):
             if status_event.is_set():
                 try:
-                    data, addr = sock.recvfrom(65536)  # max UDP size
-                    ip, port = addr
-                    if ip not in ip_whitelist and ip_whitelist != []:
-                        logger.info(f"{name} UDP Proxy: Address {ip}:{port} is not in white list")
+
+                    res = listener.get_latest(with_addr=with_addr)
+                    #logger.debug(f"{name}, {with_addr}, {res}")
+                    if res is None:
+                        time.sleep(0.001)
                         continue
+
+                    if with_addr:
+                        data, addr = res
+                        ip, port = addr
+                        if ip_whitelist and ip not in ip_whitelist:
+                            logger.info(f"{name} UDP Proxy: Address {ip}:{port} is not in white list")
+                            continue
+                    else:
+                        data = res
+                        addr = None
+
                     sock.sendto(transformer(data), (target_ip, target_port))
                     cur_time = time.time()
                     if cur_time - last_inp_log_time >= log_delay:
@@ -38,4 +50,4 @@ def udp_proxy_loop(listen_ip, listen_port, target_ip, target_port, ip_whitelist 
     finally:
         if status_event:
             status_event.clear()
-        sock.close()
+        listener.stop() 

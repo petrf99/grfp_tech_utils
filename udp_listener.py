@@ -6,26 +6,38 @@ import time
 from tech_utils.logger import init_logger
 logger = init_logger("UDPListener")
 
-class LatestValueBuffer:
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._value = None
+from collections import deque
+from threading import Lock
 
-    def set(self, val):
-        with self._lock:
-            self._value = val
+class RingBuffer:
+    def __init__(self, max_size=1):
+        self._deque = deque(maxlen=max_size)
+        self._lock = Lock()
 
-    def get(self):
+    def set(self, val, addr):
+        """Добавить значение (val[, addr]) в буфер.
+        Старое будет отброшено, если буфер заполнен.
+        """
         with self._lock:
-            val = self._value
-            self._value = None
-            return val
+            self._deque.append((val, addr))
+
+    def get(self, with_addr=False):
+        """Получить следующее значение из буфера (FIFO).
+        Вернёт None, если буфер пуст.
+        """
+        with self._lock:
+            if not self._deque:
+                return None
+            val, addr = self._deque.popleft()
+            return (val, addr) if with_addr else val
+        
 
 class UDPListener:
-    def __init__(self, port, parse_json=True, bind_host="0.0.0.0"):
+    def __init__(self, port, parse_json=True, bind_host="0.0.0.0", save_addr=False, buffer_max_size = 1):
         self.port = port
+        self.save_addr = save_addr
         self.parse_json = parse_json
-        self.buffer = LatestValueBuffer()
+        self.buffer = RingBuffer(buffer_max_size)
 
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.bind((bind_host, port))
@@ -38,21 +50,24 @@ class UDPListener:
         self._thread.start()
 
     def _listen_loop(self):
+        logger.info("[UDPListener] Listen loop started")
         while self._running.is_set():
             try:
-                data, _ = self._sock.recvfrom(65536)
+                data, addr = self._sock.recvfrom(65536)
                 if self.parse_json:
                     data = orjson.loads(data)
-                self.buffer.set(data)
+                self.buffer.set(data, addr)
             except (orjson.JSONDecodeError, UnicodeDecodeError):
                 continue
             except socket.timeout:
                 continue
             except Exception as e:
+                if not self._running.is_set():
+                    break
                 logger.error(f"[UDPListener] Error: {e}")
 
-    def get_latest(self):
-        return self.buffer.get()
+    def get_latest(self, with_addr=False):
+        return self.buffer.get(with_addr=with_addr)
 
     def stop(self):
         self._running.clear()
