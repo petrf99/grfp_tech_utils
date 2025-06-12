@@ -13,7 +13,8 @@ def post_request(
     timeout: float = 1.0,
     event_to_set=None,
     print_func: Optional[Callable[[str], None]] = None,
-    message: Optional[str] = None
+    message: Optional[str] = None,
+    jwt: Optional[str] = None
 ):
     """
     Perform a POST request with retry logic, logging, and optional cancellation via event.
@@ -32,13 +33,18 @@ def post_request(
         Parsed response JSON dict if successful, otherwise None.
     """
     logger.info(f"Post request {description} to {url}: {payload}")
+
+    headers = {"Content-Type": "application/json"}
+    if jwt:
+        headers["Authorization"] = f"Bearer {jwt}"
+
     try:
         for k in range(retries):
             if event_to_set and not event_to_set.is_set():
                 logger.warning(f"{description} aborted: event is set")
                 return None
             try:
-                response = requests.post(url, json=payload, timeout=3)
+                response = requests.post(url, json=payload, headers=headers, timeout=3)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("status") == "ok":
