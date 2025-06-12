@@ -1,10 +1,12 @@
 import subprocess
 import time
 import sys
+import os
+from dotenv import load_dotenv
+load_dotenv()
 from tech_utils.logger import init_logger
 
 logger = init_logger("SafeSUBPRun_TechUtils")
-
 
 def _needs_sudo_retry(stderr: str, os_name: str) -> bool:
     """Check if sudo retry is needed based on stderr output."""
@@ -30,7 +32,7 @@ def safe_subp_run(
     enable_sudo_retry=False,
     promt='Please enter your password to continue',
     background=False,
-    cli_mode=False,  # <== Новый флаг
+    cli_mode=os.getenv("CLI_MODE", "False") == "True",  # <== Новый флаг
     **kwargs
 ):
     """
