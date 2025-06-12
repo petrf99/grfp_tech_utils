@@ -54,6 +54,9 @@ def post_request(
                     data = response.json()
                     reason = data.get("reason", "Unknown error")
                     logger.warning(f"{description} failed: {reason}")
+                    if 400 <= response.status_code < 500:
+                        logger.info(f"{description} — not retrying due to status_code {response.status_code}")
+                        return None
                     if print_func and message:
                         print_func(message)
             except Exception as e:
