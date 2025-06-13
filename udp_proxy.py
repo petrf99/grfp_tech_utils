@@ -3,7 +3,7 @@ import socket
 from tech_utils.udp_listener import UDPListener
 
 from tech_utils.logger import init_logger
-logger = init_logger("UDP_Proxy")
+logger = init_logger(name="UDP_Proxy", component='tech_utils')
 
 def udp_proxy_loop(listen_ip, listen_port, target_ip, target_port, buffer_max_size = 1, ip_whitelist = [], stop_events = [], status_event = None, name="UDP Proxy", log_delay = 1, transformer = lambda x: x, sock_timeout = 0.01):
     with_addr = bool(ip_whitelist)
