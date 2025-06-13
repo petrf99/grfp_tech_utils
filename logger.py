@@ -20,7 +20,10 @@ def init_logger(name: str = "App", component: str = None) -> logging.Logger:
 
     level = getattr(logging, level_str, logging.INFO)
 
-    logger = logging.getLogger(name)
+    if component:
+        logger = logging.getLogger(name + f"_{component}")
+    else:
+        logger = logging.getLogger(name)
     logger.propagate = False  # Prevent logs from being propagated to the root logger
     logger.setLevel(level)
 
