@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from tech_utils.logger import init_logger
 
-logger = init_logger("SafeSUBPRun_TechUtils")
+logger = init_logger(name="SafeSUBPRun", component="tech_utils")
 
 def _needs_sudo_retry(stderr: str, os_name: str) -> bool:
     """Check if sudo retry is needed based on stderr output."""

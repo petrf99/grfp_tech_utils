@@ -3,7 +3,7 @@ import time
 from typing import Callable, Optional
 
 from tech_utils.logger import init_logger
-logger = init_logger("TechUtils_SafePOST")
+logger = init_logger(name="SafePOSTreq", component="tech_utils")
 
 def post_request(
     url: str,

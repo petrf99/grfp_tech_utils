@@ -1,7 +1,7 @@
 import requests
 from tech_utils.logger import init_logger
 
-_logger = init_logger("FlaskServUtils")
+_logger = init_logger(name="FlaskServUtils", component="tech_utils")
 
 def shutdown_server(ip="127.0.0.1", port=8000, print_func = None, logger = _logger):
     """

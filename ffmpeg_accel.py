@@ -6,7 +6,7 @@ from typing import List
 import copy
 from tech_utils.logger import init_logger
 
-logger = init_logger("FFMPEG_Accel")
+logger = init_logger(name="FFMPEG_Accel", component="tech_utils")
 
 def cmd_ok(cmd):
     try:

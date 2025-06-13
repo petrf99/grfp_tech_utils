@@ -4,7 +4,7 @@ import orjson
 import time
 
 from tech_utils.logger import init_logger
-logger = init_logger("UDPListener")
+logger = init_logger(name="UDPListener", component="tech_utils")
 
 from collections import deque
 from threading import Lock

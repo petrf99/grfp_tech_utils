@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from tech_utils.logger import init_logger
 from tech_utils.safe_subp_run import safe_subp_run
 
-logger = init_logger("Tailscale_TechUtils")
+logger = init_logger(name="Tailscale", component="tech_utils")
 load_dotenv()
 
 # === Internal Utility Functions ===
