@@ -94,6 +94,10 @@ def get_tailscale_path() -> str:
 
 def get_tailscaled_path():
     """Find the tailscaled binary if available (Linux/macOS only)."""
+    # Не ищем tailscaled, если это macOS GUI
+    if sys.platform == "darwin" and is_tailscale_installed() == 'macos-gui':
+        return None
+    
     path = shutil.which("tailscaled")
     if path and os.path.exists(path):
         return path
@@ -119,7 +123,7 @@ def is_tailscaled_running() -> bool:
 
 
 def is_tailscale_installed() -> str | bool:
-    """Determine whether Tailscale is installed (CLI or macOS GUI)."""
+    """Determine whether Tailscale is installed (CLI, macOS GUI, or both)."""
     os_name = sys.platform
 
     if os_name.startswith("win"):
@@ -129,47 +133,67 @@ def is_tailscale_installed() -> str | bool:
         except Exception:
             return False
 
-    if shutil.which("tailscale"):
-        return True
-
     if os_name == "darwin":
+        # приоритет GUI (чтобы корректно обработать, даже если tailscale есть в PATH)
         gui_path = find_gui_tailscale_path_macos()
         if gui_path and os.path.exists(gui_path):
             return 'macos-gui'
+
+    # CLI путь (универсальный для Linux/macOS/WSL)
+    if shutil.which("tailscale"):
+        return True
 
     return False
 
 # === tailscaled Daemon Handling ===
 
 def start_tailscaled_if_needed() -> bool:
-    """Start tailscaled in background if it's not already running."""
+    """Start tailscaled or GUI Tailscale (macOS) if needed."""
     if is_tailscaled_running():
         return True
 
-    logger.info("Starting tailscaled")
+    logger.info("tailscaled is not running — attempting to start")
+
+    # macOS GUI-путь
+    if sys.platform == "darwin" and is_tailscale_installed() == 'macos-gui':
+        gui_path = find_gui_tailscale_path_macos()
+        if gui_path and os.path.exists(gui_path):
+            try:
+                subprocess.Popen(["open", "-a", gui_path])
+                logger.info("Tailscale GUI launched to trigger tailscaled")
+                for _ in range(10):
+                    time.sleep(1.5)
+                    if is_tailscaled_running():
+                        logger.info("tailscaled started via GUI")
+                        return True
+                logger.error("tailscaled did not start after GUI launch")
+                return False
+            except Exception as e:
+                logger.error(f"Failed to open Tailscale GUI: {e}")
+                return False
+
+    # CLI tailscaled
     path = get_tailscaled_path()
     if not path:
         logger.error("❌ tailscaled binary not found.")
         return False
 
     try:
-        print(f"🚀 Starting tailscaled via: {path}")
+        logger.info(f"🚀 Starting tailscaled via: {path}")
         shell_cmd = [f"{path}", "--state=mem:"]
 
         safe_subp_run(
             shell_cmd, retries=3, timeout=60, delay_between_retries=3, enable_sudo_retry=True,
-            check=True, text=True, background=True, stdin=sys.stdin, promt="Please enter your password to run Tailscale"
+            check=True, text=True, background=True, stdin=sys.stdin,
+            promt="Please enter your password to run Tailscale"
         )
 
         for _ in range(10):
             time.sleep(1.5)
             if is_tailscaled_running():
-                print("✅ tailscaled is now running.")
-                time.sleep(3)
                 logger.info("tailscaled is now running")
                 return True
 
-        print("❌ tailscaled did not start within timeout.")
         logger.error("tailscaled did not start within timeout.")
         return False
 
@@ -198,7 +222,7 @@ def tailscale_up(hostname: str, auth_token: str) -> bool:
             return False
 
     ts_path = get_tailscale_path()
-    cmd = [ts_path, "up", f"--authkey={auth_token}", f"--hostname={hostname}"]
+    cmd = [ts_path, "up", f"--authkey={auth_token}", f"--hostname={hostname}", "--reset"]
 
     try:
         logger.info(f"Starting tailscale for {hostname}")
