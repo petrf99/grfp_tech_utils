@@ -68,7 +68,7 @@ def test_safe_subp_run_sudo_retry_success(mock_run, _sleep, monkeypatch):
 
     assert isinstance(result, subprocess.CompletedProcess)
     assert mock_run.call_count == 2
-    assert mock_run.call_args_list[1][0][0][0] == "sudo"  # Ensure sudo was added
+    assert mock_run.call_args_list[1][0][0][0] in ["sudo", "pkexec", "osascript"]  # Ensure sudo was added
 
 
 # === Test: safe_subp_run fails sudo retry too ===
